@@ -528,7 +528,8 @@ isetifmode: TOK_IFMODE TOK_STRING
   int ifcnt = ifs_in_curr_cfg;
   struct olsr_if *ifs = olsr_cnf->interfaces;
 	int mode = (strcmp($2->string, "ether") == 0)?IF_MODE_ETHER:IF_MODE_MESH;
-
+  if (strcmp($2->string, "PLC") == 0)
+    mode = IF_MODE_PLC;
   PARSER_DEBUG_PRINTF("\tMode: %s\n", $2->string);
 
 	SET_IFS_CONF(ifs, ifcnt, mode, mode);
