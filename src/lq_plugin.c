@@ -52,6 +52,7 @@
 #include "lq_plugin_default_fpm.h"
 #include "lq_plugin_default_ff.h"
 #include "lq_plugin_default_ffeth.h"
+#include "lq_plugin_default_hybrid_plc.h"
 
 #include <assert.h>
 
