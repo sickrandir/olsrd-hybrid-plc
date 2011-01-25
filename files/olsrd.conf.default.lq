@@ -17,10 +17,10 @@ LoadPlugin "olsrd_txtinfo.so.0.1"
     PlParam     "Accept"   "127.0.0.1"
 }
 
-#LoadPlugin "olsrd_hybrid_PLC.so.0.1"
-#{
-#    PlParam     "test"   "ok"
-#}
+LoadPlugin "olsrd_hybrid_PLC.so.0.1"
+{
+    PlParam     "test"   "ok"
+}
 
 #LoadPlugin "olsrd_mini.so.0.1"
 #{
@@ -41,7 +41,7 @@ Interface "br0"
     # valid Modes are "mesh" and "ether"
     # (default is "mesh")
 
-    Mode "ether"
+    Mode "PLC"
     # PlcMac "00:0C:C3:44:0C:F3"
     
 }
