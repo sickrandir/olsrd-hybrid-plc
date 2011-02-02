@@ -262,12 +262,12 @@ void
 print_plc_peer_neighbors(void)
 {
   int idx;
-  olsr_printf(1, "\n---IP address ----- PLC MAC ------TX-RATE---RX-RATE-----RAW MODULATION RATE (Mbits/s)\n");
+  olsr_printf(3, "\n---IP address ----- PLC MAC ------TX-RATE---RX-RATE-----RAW MODULATION RATE (Mbits/s)\n");
   for (idx = 0; idx < HASHSIZE; idx++) {
     struct plc_peer_entry *entry;
     for (entry = plc_peer_neighbors[idx].next; entry != &plc_peer_neighbors[idx]; entry = entry->next) {
       struct ipaddr_str buf;
-      olsr_printf(1, "\n%s---%02X:%02X:%02X:%02X:%02X:%02X ----%d  /  %d-----%.2f\n", olsr_ip_to_string(&buf, &entry->plc_peer_main_addr), entry->plc_data.mac[0], entry->plc_data.mac[1], entry->plc_data.mac[2], entry->plc_data.mac[3], entry->plc_data.mac[4], entry->plc_data.mac[5], entry->plc_data.tx_rate, entry->plc_data.rx_rate, entry->plc_data.raw_modulation_rate);
+      olsr_printf(3, "\n%s---%02X:%02X:%02X:%02X:%02X:%02X ----%d  /  %d-----%.2f\n", olsr_ip_to_string(&buf, &entry->plc_peer_main_addr), entry->plc_data.mac[0], entry->plc_data.mac[1], entry->plc_data.mac[2], entry->plc_data.mac[3], entry->plc_data.mac[4], entry->plc_data.mac[5], entry->plc_data.tx_rate, entry->plc_data.rx_rate, entry->plc_data.raw_modulation_rate);
     }
   }
 }
