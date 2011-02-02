@@ -50,13 +50,14 @@
 #include <ctype.h>
 
 #include "linklayer_plc_data.h"
-//#include "sockraw.h"
-
-
+#include "plc_service.h"
 
 #define PLUGIN_INTERFACE_VERSION 5
 
 static void update_plc(void);
+static void start_distribution_service(void);
+
+struct timer_entry * start_distribution;
 
 /****************************************************************************
  *                Functions that the plugin MUST provide                    *
@@ -70,34 +71,6 @@ int olsrd_plugin_interface_version(void) {
 	return PLUGIN_INTERFACE_VERSION;
 }
 
-//static int set_plugin_plc_mac(const char *value, void *data __attribute__ ((unused)), set_plugin_parameter_addon addon __attribute__ ((unused))) {
-//	int i, j;
-//	unsigned int temp;
-//	u_char ch;
-//	i = 0;
-//	j = 0;
-//	printf("\n*** Hybrid PLC: parameter plc_mac: %s\n", value);
-//	while (value[i] != '\0') {
-//		if (value[i] == ':') {
-//			i++;
-//			continue;
-//		}
-//		//Convert letter into lower case.
-//		ch = tolower(value[i]);
-//		printf("\n*** Current character: %c\n", ch);
-//		if ((ch < '0' || ch > '9') && (ch < 'a' || ch > 'f')) {
-//			return 1;
-//		}
-//		sscanf(value+i, "%02x", &temp);
-//		printf("\n*** temp: %02x\n", temp);
-//		plc_mac[j] = temp;
-//		printf("\n*** plc_mac[2]: %02x\n", plc_mac[2]);
-//		i = i+2;
-//		j++;
-//	}
-//	printf("PLC MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n", plc_mac[0], plc_mac[1], plc_mac[2], plc_mac[3], plc_mac[4], plc_mac[5]);
-//	return 0;
-//}
 
 static int
 set_plugin_test(const char *value, void *data __attribute__ ((unused)), set_plugin_parameter_addon addon __attribute__ ((unused)))
@@ -132,11 +105,21 @@ int olsrd_plugin_init(void) {
 	init_plc_peer_neighbors();
 	r = init_plc_communication("eth0");
 	if (r == 1)
-	  olsr_printf(1, "olsrd: plugin: sockraw: pcap init success!");
+	  olsr_printf(1, "olsrd: plugin: plc_service: pcap init success!");
 	olsr_start_timer(5 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &update_plc, NULL, 0);
-  return 1;
+	olsr_start_timer(5 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &print_plc_peer_neighbors, NULL, 0);
+	//olsr_start_timer(5 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &print_plc_peer_neighbors, NULL, 0);
+	start_distribution = olsr_start_timer(1 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &start_distribution_service, NULL, 0);
+	return 1;
 }
 
+
+static void start_distribution_service(void) {
+  if (is_ready()) {
+    distribution_service_init();
+    olsr_stop_timer(start_distribution);
+  }
+}
 
 
 static void update_plc(void) {

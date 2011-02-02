@@ -1,6 +1,6 @@
 DebugLevel  1
 
-LinkQualityAlgorithm    "etx_ffeth"
+LinkQualityAlgorithm    "etx_hybrid_plc"
 
 # Fisheye mechanism for TCs (0 meansoff, 1 means on)
 # (default is 1)
@@ -42,6 +42,4 @@ Interface "br0"
     # (default is "mesh")
 
     Mode "PLC"
-    # PlcMac "00:0C:C3:44:0C:F3"
-    
 }

@@ -59,6 +59,8 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include "linklayer_plc_data.h"
+
 
 #define LQ_PLUGIN_LC_MULTIPLIER 1024
 #define LQ_PLUGIN_RELEVANT_COSTCHANGE_FF 16
@@ -266,7 +268,7 @@ default_lq_hybrid_plc_timer(void __attribute__ ((unused)) * context)
 
       tlq->lq.valueLq = (uint8_t) (fpmtoi(ratio));
     }
-    OLSR_PRINTF(1, "Interface mode: %d\n", link->inter->mode);
+    OLSR_PRINTF(3, "Interface mode: %d\n", link->inter->mode);
     /* ethernet booster */
     if (link->inter->mode == IF_MODE_ETHER) {
       if (tlq->lq.valueLq > (uint8_t)(0.95 * 255)) {
@@ -288,6 +290,14 @@ default_lq_hybrid_plc_timer(void __attribute__ ((unused)) * context)
     tlq->activePtr = (tlq->activePtr + 1) % LQ_HYBRID_PLC_WINDOW;
     tlq->total[tlq->activePtr] = 0;
     tlq->received[tlq->activePtr] = 0;
+    if (link->inter->mode == IF_MODE_PLC) {
+      struct plc_peer_entry *plc_peer;
+      plc_peer = lookup_plc_peer_by_ip(&link->neighbor_iface_addr);
+      if (plc_peer != NULL) {
+        tlq->lq.bandwidth = 90;
+        tlq->lq.quality = plc_peer->plc_data.tx_rate;
+      }
+    }
   } OLSR_FOR_ALL_LINK_ENTRIES_END(link);
 
   default_lq_hybrid_plc_handle_lqchange();
@@ -313,6 +323,7 @@ default_lq_calc_cost_hybrid_plc(const void *ptr)
 {
   const struct default_lq_hybrid_plc *lq = ptr;
   olsr_linkcost cost;
+  fpm etx, bw;
   bool ether;
   int lq_int, nlq_int;
 
@@ -331,11 +342,13 @@ default_lq_calc_cost_hybrid_plc(const void *ptr)
   if (nlq_int > 0 && nlq_int < 255) {
     nlq_int++;
   }
-  cost = fpmidiv(itofpm(255 * 255), lq_int * nlq_int);
-  if (ether) {
-    /* ethernet boost */
-    cost /= 10;
-  }
+  etx = fpmidiv(itofpm(255 * 255), lq_int * nlq_int);
+  bw = fpmidiv(itofpm(lq->bandwidth * lq->quality), 255);
+  cost = fpmmul(etx, bw);
+//  if (ether) {
+//    /* ethernet boost */
+//    cost /= 10;
+//  }
 
   if (cost > LINK_COST_BROKEN)
     return LINK_COST_BROKEN;

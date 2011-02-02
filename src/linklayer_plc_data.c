@@ -48,18 +48,20 @@
 #include "linklayer_plc_data.h"
 
 uint8_t own_plc_mac[6];
-
+static ready;
 struct plc_peer_entry plc_peer_neighbors[HASHSIZE];
+
 
 void
 init_plc_peer_neighbors(void)
 {
   int i;
-
   for (i = 0; i < HASHSIZE; i++) {
     plc_peer_neighbors[i].next = &plc_peer_neighbors[i];
     plc_peer_neighbors[i].prev = &plc_peer_neighbors[i];
   }
+  memset(own_plc_mac, 0, 6);
+  ready = false;
 }
 
 /**
@@ -123,7 +125,7 @@ insert_plc_peer_neighbor(const union olsr_ip_addr *main_addr, unsigned char *mac
 
   for (new_peer = plc_peer_neighbors[hash].next; new_peer != &plc_peer_neighbors[hash]; new_peer = new_peer->next) {
     if (ipequal(&new_peer->plc_peer_main_addr, main_addr))
-      return new_peer;
+      return 0;
   }
 
   //olsr_printf(3, "inserting peer\n");
@@ -137,7 +139,7 @@ insert_plc_peer_neighbor(const union olsr_ip_addr *main_addr, unsigned char *mac
   /* Queue */
   QUEUE_ELEM(plc_peer_neighbors[hash], new_peer);
 
-  return new_peer;
+  return 1;
 }
 
 
@@ -180,44 +182,75 @@ struct plc_peer_entry *
 lookup_plc_peer_by_mac(unsigned char *mac)
 {
   struct plc_peer_entry *entry;
-  int i;
+  int i,j;
+  olsr_printf(3, "olsrd: linklayer_plc_data: in lookup: lookup di: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
   //brute force lookup per mac address
   for (i = 0; i < HASHSIZE; i++) {
 	  entry = &plc_peer_neighbors[i];
-	  if (memcmp(mac, entry->plc_data.mac, 6) == 0) {
-	    olsr_printf(3, "linklayer_plc_data: lookup by mac: trovato!");
-	    return entry;
-	  }
+
 	  for (entry = plc_peer_neighbors[i].next; entry != &plc_peer_neighbors[i]; entry = entry->next) {
-	      //olsr_printf(3, "Checking %s\n", olsr_ip_to_string(&buf, &entry->plc_peer_main_addr));
-		  if (memcmp(mac, entry->plc_data.mac, 6) == 0)
-		  	  return entry;
+      if (memcmp(mac, entry->plc_data.mac, 6) == 0)
+        return entry;
 	  }
   }
   return NULL;
 }
 
-const char * get_own_plc_mac(void) {
+struct plc_peers_iterator *init_plc_peers_iterator() {
+  struct plc_peers_iterator iter;
+  iter.num_iterated = 0;
+  return &iter;
+}
+
+struct plc_peer_entry *iter_next(struct plc_peers_iterator *iter) {
+  struct plc_peer_entry *entry;
+  int i, j;
+  j = 0;
+
+  for (i = 0; i < HASHSIZE; i++) {
+    entry = &plc_peer_neighbors[i];
+    for (entry = plc_peer_neighbors[i].next; entry != &plc_peer_neighbors[i]; entry = entry->next) {
+      j++;
+      if (j > iter->num_iterated) {
+        iter->num_iterated++;
+        return entry;
+      }
+    }
+  }
+  return NULL;
+}
+
+
+unsigned char * get_own_plc_mac(void) {
 	return own_plc_mac;
 }
 
 int set_own_plc_mac(unsigned char * mac) {
 	memcpy(own_plc_mac, mac, 6);
-	olsr_printf(3, "olsrd: linklayer_plc_data: My PLC MAC address: %02x:%02x:%02x:%02x:%02x:%02x\n", own_plc_mac[0], own_plc_mac[1], own_plc_mac[2], own_plc_mac[3], own_plc_mac[4], own_plc_mac[5]);
+	ready = true;
+	olsr_printf(3, "olsrd: linklayer_plc_data: My PLC MAC address: %02X:%02X:%02X:%02X:%02X:%02X\n", own_plc_mac[0], own_plc_mac[1], own_plc_mac[2], own_plc_mac[3], own_plc_mac[4], own_plc_mac[5]);
 }
 
 int update_plc_peer_data(struct plc_data * p_data) {
   struct plc_peer_entry *entry;
+  olsr_printf(3, "olsrd: linklayer_plc_data: lookup di: %02X:%02X:%02X:%02X:%02X:%02X\n", p_data->mac[0], p_data->mac[1], p_data->mac[2], p_data->mac[3], p_data->mac[4], p_data->mac[5]);
   entry = lookup_plc_peer_by_mac(p_data->mac);
-  if(entry != NULL)
+  if(entry == NULL)
     return 0;
   if(entry != NULL) {
+    olsr_printf(3, "olsrd: linklayer_plc_data: Updating PLC MAC: %02X:%02X:%02X:%02X:%02X:%02X with TX_rate: %d - RX_rate: %d\n", entry->plc_data.mac[0], entry->plc_data.mac[1], entry->plc_data.mac[2], entry->plc_data.mac[3], entry->plc_data.mac[4], entry->plc_data.mac[5], p_data->rx_rate, p_data->rx_rate);
     entry->plc_data.rx_rate = p_data->rx_rate;
     entry->plc_data.tx_rate = p_data->tx_rate;
+    entry->plc_data.raw_modulation_rate = p_data->raw_modulation_rate;
     return 1;
   }
 }
+
+bool is_ready() {
+  return ready;
+}
+
 
 /**
  *Prints the registered neighbors and two hop neighbors
@@ -228,31 +261,15 @@ int update_plc_peer_data(struct plc_data * p_data) {
 void
 print_plc_peer_neighbors(void)
 {
-//#ifdef NODEBUG
-//  /* The whole function doesn't do anything else. */
-//#ifndef NODEBUG
-//  const int iplen = olsr_cnf->ip_version == AF_INET ? 15 : 39;
-//#endif
-//  int idx;
-//  OLSR_PRINTF(1,
-//              "\n--- %02d:%02d:%02d.%02d ------------------------------------------------ NEIGHBORS\n\n"
-//              "%*s  LQ     NLQ    SYM   MPR   MPRS  will\n", nowtm->tm_hour, nowtm->tm_min, nowtm->tm_sec, (int)now.tv_usec / 10000,
-//              iplen, "IP address");
-//
-//  for (idx = 0; idx < HASHSIZE; idx++) {
-//    struct plc_peer_entry *neigh;
-//    for (neigh = plc_peer_neighbors[idx].next; neigh != &plc_peer_neighbors[idx]; neigh = neigh->next) {
-//      struct link_entry *lnk = get_best_link_to_neighbor(&neigh->plc_peer_main_addr);
-//      if (lnk) {
-//        struct ipaddr_str buf;
-//        OLSR_PRINTF(1, "%-*s  %5.3f  %5.3f  %s  %s  %s  %d\n", iplen, olsr_ip_to_string(&buf, &neigh->plc_peer_main_addr),
-//                    lnk->loss_link_quality, lnk->neigh_link_quality, neigh->status == SYM ? "YES " : "NO  ",
-//                    neigh->is_mpr ? "YES " : "NO  ", olsr_lookup_mprs_set(&neigh->plc_peer_main_addr) == NULL ? "NO  " : "YES ",
-//                    neigh->willingness);
-//      }
-//    }
-//  }
-//#endif
+  int idx;
+  olsr_printf(1, "\n---IP address ----- PLC MAC ------TX-RATE---RX-RATE-----RAW MODULATION RATE (Mbits/s)\n");
+  for (idx = 0; idx < HASHSIZE; idx++) {
+    struct plc_peer_entry *entry;
+    for (entry = plc_peer_neighbors[idx].next; entry != &plc_peer_neighbors[idx]; entry = entry->next) {
+      struct ipaddr_str buf;
+      olsr_printf(1, "\n%s---%02X:%02X:%02X:%02X:%02X:%02X ----%d  /  %d-----%.2f\n", olsr_ip_to_string(&buf, &entry->plc_peer_main_addr), entry->plc_data.mac[0], entry->plc_data.mac[1], entry->plc_data.mac[2], entry->plc_data.mac[3], entry->plc_data.mac[4], entry->plc_data.mac[5], entry->plc_data.tx_rate, entry->plc_data.rx_rate, entry->plc_data.raw_modulation_rate);
+    }
+  }
 }
 
 /*

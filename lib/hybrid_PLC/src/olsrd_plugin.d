@@ -31,4 +31,5 @@ src/olsrd_plugin.o src/olsrd_plugin.d: Makefile ../../Makefile.inc src/olsrd_plu
  ../../src/common/list.h /usr/include/unistd.h \
  /usr/include/bits/posix_opt.h /usr/include/bits/environments.h \
  /usr/include/bits/confname.h /usr/include/getopt.h /usr/include/sys/un.h \
- /usr/include/ctype.h ../../src/linklayer_plc_data.h ../../src/hashing.h
+ /usr/include/ctype.h ../../src/linklayer_plc_data.h ../../src/hashing.h \
+ ../../src/fpm.h src/plc_service.h

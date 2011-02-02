@@ -53,6 +53,8 @@
 struct default_lq_hybrid_plc {
   uint8_t valueLq;
   uint8_t valueNlq;
+  uint8_t bandwidth;
+  uint8_t quality;
 };
 
 struct default_lq_hybrid_plc_hello {
