@@ -107,7 +107,6 @@ int olsrd_plugin_init(void) {
 	if (r == 1)
 	  olsr_printf(1, "olsrd: plugin: plc_service: pcap init success!");
 	olsr_start_timer(5 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &update_plc, NULL, 0);
-	olsr_start_timer(5 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &print_plc_peer_neighbors, NULL, 0);
 	//olsr_start_timer(5 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &print_plc_peer_neighbors, NULL, 0);
 	start_distribution = olsr_start_timer(1 * MSEC_PER_SEC, 0, OLSR_TIMER_PERIODIC, &start_distribution_service, NULL, 0);
 	return 1;

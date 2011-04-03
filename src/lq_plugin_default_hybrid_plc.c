@@ -152,6 +152,11 @@ default_lq_hybrid_plc_handle_lqchange(void) {
         relevant = true;
       }
     }
+    if (lq->smoothed_lq.quality < lq->lq.quality) {
+          if (lq->lq.quality - lq->smoothed_lq.quality > lq->smoothed_lq.quality/10) {
+            relevant = true;
+      }
+    }
 
     if (relevant) {
       memcpy(&lq->smoothed_lq, &lq->lq, sizeof(struct default_lq_hybrid_plc));
@@ -294,9 +299,15 @@ default_lq_hybrid_plc_timer(void __attribute__ ((unused)) * context)
       struct plc_peer_entry *plc_peer;
       plc_peer = lookup_plc_peer_by_ip(&link->neighbor_iface_addr);
       if (plc_peer != NULL) {
-        tlq->lq.bandwidth = 90;
         tlq->lq.quality = plc_peer->plc_data.tx_rate;
+//        if (plc_peer->plc_data.tx_rate < plc_peer->plc_data.rx_rate)
+//          tlq->lq.quality = plc_peer->plc_data.tx_rate;
+//        else
+//          tlq->lq.quality = plc_peer->plc_data.rx_rate;
       }
+      tlq->lq.bandwidth = 151;
+      if (tlq->lq.quality < 1)
+        tlq->lq.quality = 1;
     }
   } OLSR_FOR_ALL_LINK_ENTRIES_END(link);
 
@@ -318,38 +329,59 @@ default_lq_initialize_hybrid_plc(void)
 	printf("*** Hybrid PLC: plugin_init\n");
 }
 
-static olsr_linkcost
-default_lq_calc_cost_hybrid_plc(const void *ptr)
-{
+static olsr_linkcost default_lq_calc_cost_hybrid_plc(const void *ptr) {
   const struct default_lq_hybrid_plc *lq = ptr;
   olsr_linkcost cost;
-  fpm etx, bw;
+  fpm etx, bw, costfpm, c;
+  float etxf, bwf, costf;
   bool ether;
   int lq_int, nlq_int;
 
-  if (lq->valueLq < (unsigned int)(255 * MINIMAL_USEFUL_LQ) || lq->valueNlq < (unsigned int)(255 * MINIMAL_USEFUL_LQ)) {
+  if (lq->valueLq < (unsigned int) (255 * MINIMAL_USEFUL_LQ) || lq->valueNlq
+      < (unsigned int) (255 * MINIMAL_USEFUL_LQ)) {
     return LINK_COST_BROKEN;
   }
 
   ether = lq->valueLq == 255 && lq->valueNlq == 255;
 
-  lq_int = (int)lq->valueLq;
+  lq_int = (int) lq->valueLq;
   if (lq_int > 0 && lq_int < 255) {
     lq_int++;
   }
 
-  nlq_int = (int)lq->valueNlq;
+  nlq_int = (int) lq->valueNlq;
   if (nlq_int > 0 && nlq_int < 255) {
     nlq_int++;
   }
-  etx = fpmidiv(itofpm(255 * 255), lq_int * nlq_int);
-  bw = fpmidiv(itofpm(lq->bandwidth * lq->quality), 255);
-  cost = fpmmul(etx, bw);
-//  if (ether) {
-//    /* ethernet boost */
-//    cost /= 10;
-//  }
 
+
+  //etx = fpmidiv(itofpm(255 * 255), lq_int * nlq_int);
+  OLSR_PRINTF(1, "lq_bandwidth: %d\n", lq->bandwidth);
+  OLSR_PRINTF(1, "lq_quality: %d\n", lq->quality);
+  //c = itofpm(lq->bandwidth * lq->quality);
+  //OLSR_PRINTF(1, "c: %d\n", c);
+  //bw = fpmdiv(itofpm(255), c);
+  //OLSR_PRINTF(1, "bw: %d\n", bw);
+
+  //if (bwf < 1)
+  //  bwf = 1;
+  //cost = fpmmul(etx, bw);
+  //  if (ether) {
+  //    /* ethernet boost */
+  //    cost /= 10;
+  //  }
+  //
+
+
+  etxf = (255 * 255) / (lq_int * nlq_int);
+  bwf = (lq->bandwidth * lq->quality) / 255;
+  OLSR_PRINTF(1, "bwf: %f\n", bwf);
+  if (bwf < 5)
+    bwf = 5;
+  costf = etxf / bwf * 100 * LQ_PLUGIN_LC_MULTIPLIER;
+  OLSR_PRINTF(1, "costf: %f\n", costf);
+  cost = (olsr_linkcost) costf;
+  OLSR_PRINTF(1, "cost: %d\n", cost);
   if (cost > LINK_COST_BROKEN)
     return LINK_COST_BROKEN;
   if (cost == 0)
@@ -361,8 +393,8 @@ static int
 default_lq_serialize_hello_lq_pair_hybrid_plc(unsigned char *buff, void *ptr)
 {
   struct default_lq_hybrid_plc *lq = ptr;
-  buff[0] = (unsigned char)(0);
-  buff[1] = (unsigned char)(0);
+  buff[0] = (unsigned char)lq->bandwidth;
+  buff[1] = (unsigned char)lq->quality;
   buff[2] = (unsigned char)lq->valueLq;
   buff[3] = (unsigned char)lq->valueNlq;
   return 4;
@@ -373,7 +405,8 @@ default_lq_deserialize_hello_lq_pair_hybrid_plc(const uint8_t ** curr, void *ptr
 {
   struct default_lq_hybrid_plc *lq = ptr;
 
-  pkt_ignore_u16(curr);
+  pkt_get_u8(curr, &lq->bandwidth);
+  pkt_get_u8(curr, &lq->quality);
   pkt_get_u8(curr, &lq->valueLq);
   pkt_get_u8(curr, &lq->valueNlq);
 }
@@ -383,8 +416,8 @@ default_lq_serialize_tc_lq_pair_hybrid_plc(unsigned char *buff, void *ptr)
 {
   struct default_lq_hybrid_plc *lq = ptr;
 
-  buff[0] = (unsigned char)(0);
-  buff[1] = (unsigned char)(0);
+  buff[0] = (unsigned char)lq->bandwidth;
+  buff[1] = (unsigned char)lq->quality;
   buff[2] = (unsigned char)lq->valueLq;
   buff[3] = (unsigned char)lq->valueNlq;
 
@@ -396,7 +429,8 @@ default_lq_deserialize_tc_lq_pair_hybrid_plc(const uint8_t ** curr, void *ptr)
 {
   struct default_lq_hybrid_plc *lq = ptr;
 
-  pkt_ignore_u16(curr);
+  pkt_get_u8(curr, &lq->bandwidth);
+  pkt_get_u8(curr, &lq->quality);
   pkt_get_u8(curr, &lq->valueLq);
   pkt_get_u8(curr, &lq->valueNlq);
 }
@@ -420,6 +454,7 @@ default_lq_memorize_foreign_hello_hybrid_plc(void *ptrLocal, void *ptrForeign)
   struct default_lq_hybrid_plc *foreign = ptrForeign;
 
   if (foreign) {
+    //per come è costruita la metrica non è necessario memorizzare lq.quality esterna. E' identica a quella locale.
     local->lq.valueNlq = foreign->valueLq;
   } else {
     local->lq.valueNlq = 0;

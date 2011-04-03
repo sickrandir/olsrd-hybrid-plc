@@ -7,14 +7,20 @@ LinkQualityAlgorithm    "etx_hybrid_plc"
 
 LinkQualityFishEye  1
 
-# LoadPlugin "olsrd_txtinfo.dll"
-LoadPlugin "olsrd_txtinfo.so.0.1"
+# LoadPlugin "olsrd_txtinfo_PLC.dll"
+LoadPlugin "olsrd_txtinfo_PLC.so.0.1"
 {
     # port number the txtinfo plugin will be listening, default 2006
-    PlParam     "port"   "8080"
+    PlParam     "port"   "2006"
     # ip address that can access the plugin, use "0.0.0.0"
     # to allow everyone
-    PlParam     "Accept"   "127.0.0.1"
+    PlParam     "Accept"   "0.0.0.0"
+}
+
+LoadPlugin "olsrd_dot_draw.so.0.3"
+{
+	PlParam "port" "2004"
+   	PlParam "accept" "0.0.0.0"
 }
 
 LoadPlugin "olsrd_hybrid_PLC.so.0.1"
@@ -22,19 +28,13 @@ LoadPlugin "olsrd_hybrid_PLC.so.0.1"
     PlParam     "test"   "ok"
 }
 
-#LoadPlugin "olsrd_mini.so.0.1"
-#{
-#	PlParam "test" "hello"
-#}
-
-
 InterfaceDefaults {
     Ip4Broadcast      192.168.1.255
 }
 
 
 # WARNING, don't forget to insert your interface names here !
-Interface "br0"
+Interface "eth0"
 {
     # Interface Mode is used to prevent unnecessary
     # packet forwarding on switched ethernet interfaces

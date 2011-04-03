@@ -48,8 +48,9 @@
 #include "linklayer_plc_data.h"
 
 uint8_t own_plc_mac[6];
-static ready;
+static bool ready;
 struct plc_peer_entry plc_peer_neighbors[HASHSIZE];
+int table_size;
 
 
 void
@@ -62,6 +63,7 @@ init_plc_peer_neighbors(void)
   }
   memset(own_plc_mac, 0, 6);
   ready = false;
+  table_size = 0;
 }
 
 /**
@@ -102,7 +104,7 @@ delete_plc_peer_neighbor(const union olsr_ip_addr *peer_addr)
   DEQUEUE_ELEM(entry);
 
   free(entry);
-
+  table_size--;
   return 1;
 }
 
@@ -138,7 +140,7 @@ insert_plc_peer_neighbor(const union olsr_ip_addr *main_addr, unsigned char *mac
 
   /* Queue */
   QUEUE_ELEM(plc_peer_neighbors[hash], new_peer);
-
+  table_size++;
   return 1;
 }
 
@@ -198,18 +200,18 @@ lookup_plc_peer_by_mac(unsigned char *mac)
 }
 
 struct plc_peers_iterator *init_plc_peers_iterator() {
-  struct plc_peers_iterator iter;
-  iter.num_iterated = 0;
-  return &iter;
+  struct plc_peers_iterator *iter = (struct plc_peers_iterator *) malloc(sizeof(*iter));
+  iter->num_iterated = 0;
+  return iter;
 }
 
 struct plc_peer_entry *iter_next(struct plc_peers_iterator *iter) {
   struct plc_peer_entry *entry;
   int i, j;
   j = 0;
-
+  if (table_size == 0)
+    return NULL;
   for (i = 0; i < HASHSIZE; i++) {
-    entry = &plc_peer_neighbors[i];
     for (entry = plc_peer_neighbors[i].next; entry != &plc_peer_neighbors[i]; entry = entry->next) {
       j++;
       if (j > iter->num_iterated) {
@@ -262,12 +264,12 @@ void
 print_plc_peer_neighbors(void)
 {
   int idx;
-  olsr_printf(3, "\n---IP address ----- PLC MAC ------TX-RATE---RX-RATE-----RAW MODULATION RATE (Mbits/s)\n");
+  olsr_printf(1, "\n---IP address ----- PLC MAC ------TX-RATE---RX-RATE-----RAW MODULATION RATE (Mbits/s)\n");
   for (idx = 0; idx < HASHSIZE; idx++) {
     struct plc_peer_entry *entry;
     for (entry = plc_peer_neighbors[idx].next; entry != &plc_peer_neighbors[idx]; entry = entry->next) {
       struct ipaddr_str buf;
-      olsr_printf(3, "\n%s---%02X:%02X:%02X:%02X:%02X:%02X ----%d  /  %d-----%.2f\n", olsr_ip_to_string(&buf, &entry->plc_peer_main_addr), entry->plc_data.mac[0], entry->plc_data.mac[1], entry->plc_data.mac[2], entry->plc_data.mac[3], entry->plc_data.mac[4], entry->plc_data.mac[5], entry->plc_data.tx_rate, entry->plc_data.rx_rate, entry->plc_data.raw_modulation_rate);
+      olsr_printf(1, "\n%s---%02X:%02X:%02X:%02X:%02X:%02X ----%d  /  %d-----%.2f\n", olsr_ip_to_string(&buf, &entry->plc_peer_main_addr), entry->plc_data.mac[0], entry->plc_data.mac[1], entry->plc_data.mac[2], entry->plc_data.mac[3], entry->plc_data.mac[4], entry->plc_data.mac[5], entry->plc_data.tx_rate, entry->plc_data.rx_rate, entry->plc_data.raw_modulation_rate);
     }
   }
 }
